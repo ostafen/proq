@@ -3,7 +3,7 @@ module github.com/ostafen/proq
 go 1.23.3
 
 require (
-	github.com/gizak/termui/v3 v3.1.0
+	github.com/ostafen/termui/v3 v3.0.0-20250308201611-ef017fce928d
 	github.com/stretchr/testify v1.10.0
 )
 

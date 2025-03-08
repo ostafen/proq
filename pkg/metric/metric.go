@@ -224,7 +224,7 @@ func ParseHistogram(metrics []RawMetric) (map[string]Histogram, []RawMetric) {
 		}
 
 		if len(hist.buckets) > 0 && hist.count != nil && hist.sum != nil {
-			bins, err := tryParseBins(hist.buckets)
+			bins, err := parseHistogramBins(hist.buckets)
 			if err == nil {
 				out[k] = Histogram{
 					Name:   name,
@@ -242,7 +242,7 @@ func ParseHistogram(metrics []RawMetric) (map[string]Histogram, []RawMetric) {
 	return out, filteredMetrics
 }
 
-func tryParseBins(bucketMetrics []RawMetric) ([]Bin, error) {
+func parseHistogramBins(bucketMetrics []RawMetric) ([]Bin, error) {
 	buckets := make([]Bin, len(bucketMetrics))
 	for i, b := range bucketMetrics {
 		v := b.Find("le")

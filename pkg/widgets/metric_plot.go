@@ -3,8 +3,8 @@ package widgets
 import (
 	"time"
 
-	ui "github.com/gizak/termui/v3"
-	"github.com/gizak/termui/v3/widgets"
+	ui "github.com/ostafen/termui/v3"
+	"github.com/ostafen/termui/v3/widgets"
 )
 
 type MetricPlot struct {
@@ -63,7 +63,24 @@ func (p *MetricPlot) Update(sample float64) {
 	} else {
 		p.Data[0] = append(p.Data[0], sample)
 	}
+
+	p.MaxVal = max(p.Data[0])
+
 	ui.Render(p)
+}
+
+func max(values []float64) float64 {
+	if len(values) == 0 {
+		return 0
+	}
+
+	max := values[0]
+	for _, v := range values[1:] {
+		if v > max {
+			max = v
+		}
+	}
+	return max
 }
 
 func (p *MetricPlot) Refresh(elapsedTime time.Duration) {

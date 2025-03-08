@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	ui "github.com/gizak/termui/v3"
+	ui "github.com/ostafen/termui/v3"
 
 	"github.com/ostafen/proq/pkg/metric"
 	"github.com/ostafen/proq/pkg/store"

@@ -4,10 +4,10 @@ import (
 	"math"
 	"strconv"
 
-	ui "github.com/gizak/termui/v3"
+	ui "github.com/ostafen/termui/v3"
 
-	"github.com/gizak/termui/v3/widgets"
 	"github.com/ostafen/proq/pkg/metric"
+	"github.com/ostafen/termui/v3/widgets"
 )
 
 type Histogram struct {
