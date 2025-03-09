@@ -1,6 +1,8 @@
 package widgets
 
 import (
+	"time"
+
 	ui "github.com/ostafen/termui/v3"
 )
 
@@ -14,6 +16,19 @@ type MetricsDash struct {
 	List   *MetricList
 	Hist   *Histogram
 	Prompt *Prompt
+}
+
+func NewMetricDash(
+	pollInterval time.Duration,
+	displayInterval time.Duration,
+) *MetricsDash {
+	return &MetricsDash{
+		Prompt: NewPrompt(),
+		Plot: NewMetricPlot(
+			pollInterval,
+			displayInterval,
+		),
+	}
 }
 
 const yAxisLabelsWidth = 4 // from termui
@@ -51,4 +66,20 @@ func (dash *MetricsDash) OnKeyPressed(key string) bool {
 
 	ui.Render(drawables...)
 	return false
+}
+
+func (dash *MetricsDash) SetMetricList(metrics []MetricInfo) {
+	dash.List.AddMetrics(metrics)
+}
+
+func (dash *MetricsDash) ShowHistograms() {
+	dash.List.ShowHistograms()
+}
+
+func (dash *MetricsDash) FilterMetrics(filter string) error {
+	return dash.List.Filter(filter)
+}
+
+func (dash *MetricsDash) ResetMetrics() {
+	dash.List.Reset()
 }

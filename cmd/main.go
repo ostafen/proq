@@ -7,7 +7,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"sort"
 	"strings"
 	"time"
 
@@ -21,10 +20,11 @@ import (
 type App struct {
 	displayWindow time.Duration
 
-	stream        *store.Stream
-	ch            chan float64
-	url           string
-	fetchInterval time.Duration
+	stream *store.Stream
+	ch     chan float64
+
+	metricsURL   string
+	pollInterval time.Duration
 
 	dash  *wg.MetricsDash
 	store *store.MetricStore
@@ -38,7 +38,7 @@ func (s *App) Start() {
 
 	s.dash.Resize()
 
-	ticker := time.NewTicker(s.fetchInterval)
+	ticker := time.NewTicker(s.pollInterval)
 	uiEvents := ui.PollEvents()
 	for {
 		select {
@@ -116,15 +116,38 @@ func (app *App) renderGenericMetric(m metric.MetricKey) {
 func (app *App) cmdsHandlers() map[string]wg.CmdHandler {
 	return map[string]wg.CmdHandler{
 		"q": app.quit,
-		"f": app.filter,
+		"s": app.filter,
+		"t": app.filterByType,
+		"r": app.reset,
 	}
+}
+
+func (app *App) filterByType(_ string, args ...string) error {
+	if len(args) == 0 {
+		return fmt.Errorf("no type argument provided")
+	}
+
+	switch strings.ToLower(args[0]) {
+	case "all":
+		app.dash.ResetMetrics()
+	case "hist":
+		app.dash.ShowHistograms()
+	default:
+		return fmt.Errorf("unknown metric type\"%s\"", args[0])
+	}
+	return nil
+}
+
+func (app *App) reset(_ string, args ...string) error {
+	app.dash.ResetMetrics()
+	return nil
 }
 
 func (app *App) filter(_ string, args ...string) error {
 	if len(args) == 0 {
 		return fmt.Errorf("no filter specified")
 	}
-	return app.dash.List.Filter(args[0])
+	return app.dash.FilterMetrics(args[0])
 }
 
 func (s *App) quit(_ string, args ...string) error {
@@ -135,7 +158,7 @@ func (s *App) quit(_ string, args ...string) error {
 }
 
 func (s *App) fetch() {
-	histo, rawMetrics, err := s.fetchMetrics(s.url)
+	histo, rawMetrics, err := s.fetchMetrics(s.metricsURL)
 	if err != nil {
 		return
 	}
@@ -144,7 +167,7 @@ func (s *App) fetch() {
 		s.store.Update(&m)
 	}
 
-	s.store.UpdateHistogram(histo)
+	s.store.UpdateHistograms(histo)
 
 	metrics := make([]wg.MetricInfo, len(rawMetrics)+len(histo))
 	for i, m := range rawMetrics {
@@ -165,19 +188,7 @@ func (s *App) fetch() {
 		i++
 	}
 
-	sort.Slice(metrics, func(i, j int) bool {
-		m1 := metrics[i]
-		m2 := metrics[j]
-
-		if m1.IsHist != m2.IsHist {
-			return m1.IsHist && !m2.IsHist
-		}
-
-		res := strings.Compare(m1.Name, m2.Name)
-		return res < 0
-	})
-
-	s.dash.List.Set(metrics)
+	s.dash.SetMetricList(metrics)
 }
 
 func (s *App) fetchMetrics(url string) (map[string]metric.Histogram, []metric.RawMetric, error) {
@@ -224,26 +235,23 @@ func main() {
 	os.Args = os.Args[1:]
 
 	displayWindow := flag.Duration("window", DefaultDisplayWindow, "time size of displayed window")
-	pollInterval := flag.Duration("refresh-interval", DefaultPollInterval, "the frequency the metric endpoint is queries")
+	pollInterval := flag.Duration("poll-interval", DefaultPollInterval, "the frequency the metric endpoint is queried")
 
 	flag.Parse()
 
 	maxSamples := int(*displayWindow/(*pollInterval)) + 1
 	metricStore := store.NewMetricStore(maxSamples)
 
-	dash := &wg.MetricsDash{
-		Prompt: wg.NewPrompt(),
-		Plot: wg.NewMetricPlot(
-			*pollInterval,
-			*displayWindow,
-		),
-	}
+	dash := wg.NewMetricDash(
+		*pollInterval,
+		*displayWindow,
+	)
 
 	app := &App{
 		displayWindow: *displayWindow,
-		fetchInterval: *pollInterval,
+		pollInterval:  *pollInterval,
 		ch:            make(chan float64, 1),
-		url:           url,
+		metricsURL:    url,
 		store:         metricStore,
 		dash:          dash,
 	}

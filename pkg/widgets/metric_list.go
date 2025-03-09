@@ -2,6 +2,7 @@ package widgets
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
 	ui "github.com/ostafen/termui/v3"
@@ -16,11 +17,20 @@ type MetricInfo struct {
 	IsHist bool
 }
 
+func (mi *MetricInfo) Key() metric.MetricKey {
+	return metric.MetricKey{
+		Name:   mi.Name,
+		Labels: mi.Labels,
+	}
+}
+
 type MetricList struct {
 	selectedRow int
 
-	allMetrics      []MetricInfo
-	filteredMetrics []MetricInfo
+	allMetrics map[string]struct{}
+
+	metrics          []MetricInfo
+	displayedMetrics []MetricInfo
 
 	onMetricSelected func(m MetricInfo)
 
@@ -34,6 +44,7 @@ func NewMetricList(onMetricSelected func(m MetricInfo)) *MetricList {
 	list.TextStyle = ui.NewStyle(ui.ColorYellow)
 
 	return &MetricList{
+		allMetrics:       make(map[string]struct{}),
 		List:             list,
 		onMetricSelected: onMetricSelected,
 	}
@@ -68,48 +79,100 @@ func (l *MetricList) scroll(direction int) bool {
 }
 
 func (l *MetricList) selectMetric() bool {
-	if l.selectedRow < 0 || l.selectedRow >= len(l.filteredMetrics) {
+	if l.selectedRow < 0 || l.selectedRow >= len(l.displayedMetrics) {
 		return false
 	}
 
-	m := l.filteredMetrics[l.selectedRow]
+	m := l.displayedMetrics[l.selectedRow]
 	l.onMetricSelected(m)
 	return true
 }
 
-func (l *MetricList) Filter(filter string) error {
-	if filter == "" {
-		l.filteredMetrics = l.allMetrics
-		return fmt.Errorf("empty filter")
-	}
-
+func (l *MetricList) ShowHistograms() {
 	metrics := make([]MetricInfo, 0, len(l.allMetrics))
-	for _, m := range l.allMetrics {
-		if strings.Contains(m.Name, filter) {
+	for _, m := range l.metrics {
+		if m.IsHist {
 			metrics = append(metrics, m)
 		}
 	}
-	if len(metrics) == 0 {
-		return fmt.Errorf("\"%s\": no metric matches the specified filter", filter)
+
+	l.displayedMetrics = metrics
+	l.RenderList()
+}
+
+func wildcardToRegex(pattern string) string {
+	replacer := strings.NewReplacer(
+		".", "\\.",
+		"+", "\\+",
+		"(", "\\(",
+		")", "\\)",
+		"{", "\\{",
+		"}", "\\}",
+		"|", "\\|",
+		"^", "\\^",
+		"$", "\\$",
+	)
+
+	pattern = replacer.Replace(pattern)
+	pattern = strings.ReplaceAll(pattern, "*", ".*") // * -> .*
+	pattern = strings.ReplaceAll(pattern, "?", ".")  // ? -> .
+
+	return "^" + pattern + "$"
+}
+
+func (l *MetricList) Filter(pattern string) error {
+	exp, err := regexp.Compile(wildcardToRegex(pattern))
+	if err != nil {
+		return err
 	}
-	l.filteredMetrics = metrics
+
+	if pattern == "" {
+		l.displayedMetrics = l.metrics
+		return fmt.Errorf("empty filter")
+	}
+
+	metrics := make([]MetricInfo, 0, len(l.metrics))
+	for _, m := range l.metrics {
+		if exp.MatchString(m.Name) {
+			metrics = append(metrics, m)
+		}
+	}
+
+	if len(metrics) == 0 {
+		return fmt.Errorf("\"%s\": no metric matches the specified filter", pattern)
+	}
+	l.displayedMetrics = metrics
 
 	l.RenderList()
 	return nil
 }
 
-func (l *MetricList) Set(list []MetricInfo) {
-	l.allMetrics = list
-	if l.filteredMetrics == nil {
-		l.filteredMetrics = list
+func (l *MetricList) Reset() {
+	l.displayedMetrics = l.metrics
+	l.RenderList()
+}
+
+func (l *MetricList) AddMetrics(metrics []MetricInfo) {
+	for _, m := range metrics {
+		mk := m.Key()
+		s := mk.String()
+		_, has := l.allMetrics[s]
+		if !has {
+			l.metrics = append(l.metrics, m)
+		}
+		l.allMetrics[s] = struct{}{}
+	}
+
+	if l.displayedMetrics == nil {
+		l.displayedMetrics = l.metrics
 	}
 
 	l.RenderList()
 }
 
 func (l *MetricList) RenderList() {
-	rows := make([]string, len(l.filteredMetrics))
-	for i, m := range l.filteredMetrics {
+	rows := make([]string, len(l.displayedMetrics))
+	for i, m := range l.displayedMetrics {
 		mk := metric.MetricKey{
 			Name:   m.Name,
 			Labels: m.Labels,
@@ -124,7 +187,7 @@ func (l *MetricList) RenderList() {
 		l.Rows = rows
 	}
 
-	l.Title = fmt.Sprintf("Metrics (%d)", len(rows))
+	l.Title = fmt.Sprintf("Metrics (%d/%d)", len(rows), len(l.allMetrics))
 
 	ui.Render(l.List)
 }
