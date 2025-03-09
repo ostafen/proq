@@ -45,16 +45,16 @@ jobs:
     steps:
       - name: Checkout the code
         uses: actions/checkout@v2
-        
+      
+      - name: Download Build Artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: binaries  # Name of the artifact to download
+          path: ./artifacts  # Path to save the downloaded artifacts
+
       - name: Upload release assets to GitHub
         uses: softprops/action-gh-release@v1
         with:
-          files: |
-            bin/proq-darwin-amd64
-            bin/proq-darwin-arm64
-            bin/proq-linux-amd64
-            bin/proq-linux-arm
-            bin/proq-linux-arm64
-            bin/proq-windows-amd64
+          files: ./artifacts/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
