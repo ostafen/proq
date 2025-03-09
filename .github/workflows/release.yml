@@ -46,6 +46,12 @@ jobs:
       - name: Upload release assets to GitHub
         uses: softprops/action-gh-release@v1
         with:
-          files: bin/*  # Path to the built binaries
+          files: |
+            proq-darwin-amd64
+            proq-darwin-arm64
+            proq-linux-amd64
+            proq-linux-arm
+            proq-linux-arm64
+            proq-windows-amd64
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
