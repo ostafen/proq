@@ -30,7 +30,7 @@ jobs:
           make build  # Ensure your Makefile produces binaries for all required architectures
 
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: binaries
           path: ./bin/*  # Path to where your binaries are stored (ensure it's correct)
