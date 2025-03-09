@@ -15,11 +15,13 @@ type MetricPlot struct {
 	tickInterval time.Duration
 	currMaxTick  time.Duration
 
-	start time.Time
+	CurrWidth int
+	start     time.Time
 }
 
+const DefaultXTicks = 5
+
 func NewMetricPlot(
-	numTicks int,
 	sampleRate time.Duration,
 	windowInterval time.Duration,
 ) *MetricPlot {
@@ -31,13 +33,11 @@ func NewMetricPlot(
 	plot.Marker = widgets.MarkerBraille
 
 	maxWindowSamples := int(windowInterval/sampleRate) + 1
-	if numTicks > maxWindowSamples {
-		numTicks = maxWindowSamples
-	}
 
-	tickInterval := windowInterval / time.Duration(numTicks)
+	xTicks := min(DefaultXTicks, maxWindowSamples)
+	tickInterval := windowInterval / time.Duration(xTicks)
 
-	labels := make([]string, numTicks+1)
+	labels := make([]string, xTicks+1)
 	for i := range labels {
 		axisLabel := tickInterval * time.Duration(i)
 		labels[i] = axisLabel.String()
@@ -47,10 +47,11 @@ func NewMetricPlot(
 	return &MetricPlot{
 		Plot:         plot,
 		NumSamples:   maxWindowSamples,
-		numTicks:     numTicks,
+		numTicks:     xTicks,
 		tickInterval: tickInterval,
 		currMaxTick:  windowInterval,
 		start:        time.Now(),
+		CurrWidth:    -1,
 	}
 }
 

@@ -48,7 +48,7 @@ func NewMetricStore(numSamples int) *MetricStore {
 	}
 }
 
-func (st *MetricStore) UpdateHistogram(hs map[string]metric.Histogram) {
+func (st *MetricStore) UpdateHistograms(hs map[string]metric.Histogram) {
 	maps.Copy(st.histograms, hs)
 }
 

@@ -2,6 +2,9 @@
 
 **proq** is an open-source command-line tool that acts as an embedded in-memory Prometheus server. It allows you to pull metrics from any given endpoint that exposes Prometheus metrics and visualize them as plots and histograms directly in the terminal, powered by [termui](https://github.com/gizak/termui). This is especially useful for debugging inside a server or container where setting up a full Prometheus instance is impractical. With `proq`, you can quickly inspect metrics without any external dependencies.
 
+![Plot](screenshots/plot.png)
+
+
 ## Features
 - 🚀 Pulls and stores Prometheus metrics in memory
 - 📊 Displays real-time plots and histograms in the terminal

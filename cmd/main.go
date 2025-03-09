@@ -7,7 +7,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"sort"
 	"strings"
 	"time"
 
@@ -18,77 +17,48 @@ import (
 	wg "github.com/ostafen/proq/pkg/widgets"
 )
 
-type MetricsDash struct {
-	plot   *wg.MetricPlot
-	list   *wg.MetricList
-	hist   *wg.Histogram
-	prompt *wg.Prompt
+type App struct {
+	displayWindow time.Duration
 
-	plotHeightPerc float64
-	plotWidthPerc  float64
+	stream *store.Stream
+	ch     chan float64
+
+	metricsURL   string
+	pollInterval time.Duration
+
+	dash  *wg.MetricsDash
+	store *store.MetricStore
 }
 
-func (dash *MetricsDash) Resize(width, height int) {
-	dash.plot.HorizontalScale = (width - 4) / (dash.plot.NumSamples - 1)
-
-	const barHeight = 3
-
-	dash.plot.SetRect(0, 0, int(float64(width)*dash.plotWidthPerc), int(float64(height)*dash.plotHeightPerc))
-	dash.list.SetRect(0, int(float64(height)*dash.plotHeightPerc), width, height-barHeight)
-
-	dash.prompt.SetRect(0, height-barHeight, width, height)
-}
-
-func (s *App) Run() {
-	dash := s.dash
-
-	resize := func() {
-		width, height := ui.TerminalDimensions()
-
-		dash.Resize(width, height)
-		ui.Render(dash.list, dash.plot, dash.prompt)
+func (s *App) Start() {
+	if err := ui.Init(); err != nil {
+		log.Fatalf("failed to initialize termui: %v", err)
 	}
+	defer ui.Close()
 
-	resize()
+	s.dash.Resize()
 
-	start := time.Now()
-	ticker := time.NewTicker(s.fetchInterval)
-
+	ticker := time.NewTicker(s.pollInterval)
 	uiEvents := ui.PollEvents()
 	for {
 		select {
 		case <-ticker.C:
 			s.fetch()
 		case e := <-uiEvents:
-			if e.Type == ui.KeyboardEvent {
-				s.dash.OnKeyPressed(e.ID)
-			} else if e.Type == ui.ResizeEvent {
-				resize()
-			}
+			s.handleUIEvent(e)
 		case v := <-s.ch:
-			n := dash.plot.NumSamples / 2
-
-			if len(s.dash.plot.Data[0])+1 > dash.plot.NumSamples {
-				s.dash.plot.Data[0] = append(s.dash.plot.Data[0][n+1:], v)
-				s.dash.plot.Refresh(time.Since(start))
-			} else {
-				s.dash.plot.Data[0] = append(s.dash.plot.Data[0], v)
-			}
-			ui.Render(s.dash.plot, s.dash.prompt)
+			s.dash.Plot.Update(v)
 		}
 	}
 }
 
-type App struct {
-	displayWindow time.Duration
-
-	stream        *store.Stream
-	ch            chan float64
-	url           string
-	fetchInterval time.Duration
-
-	dash  *MetricsDash
-	store *store.MetricStore
+func (app *App) handleUIEvent(e ui.Event) {
+	switch e.Type {
+	case ui.KeyboardEvent:
+		app.dash.OnKeyPressed(e.ID)
+	case ui.ResizeEvent:
+		app.dash.Resize()
+	}
 }
 
 func (app *App) renderMetric(m wg.MetricInfo) {
@@ -115,10 +85,10 @@ func (app *App) renderHistogram(m metric.MetricKey) {
 
 	width, height := ui.TerminalDimensions()
 
-	app.dash.hist = wg.NewHistogram(h, width)
+	app.dash.Hist = wg.NewHistogram(h, width)
 
-	app.dash.hist.SetRect(0, 0, int(float64(width)), int(float64(height)*0.7))
-	ui.Render(app.dash.hist.BarChart)
+	app.dash.Hist.SetRect(0, 0, int(float64(width)), int(float64(height)*0.7))
+	ui.Render(app.dash.Hist.BarChart)
 }
 
 func (app *App) renderGenericMetric(m metric.MetricKey) {
@@ -131,45 +101,53 @@ func (app *App) renderGenericMetric(m metric.MetricKey) {
 	})
 
 	if len(samples) > 0 {
-		if len(dash.plot.Data) == 0 {
-			dash.plot.Data = [][]float64{samples}
+		if len(dash.Plot.Data) == 0 {
+			dash.Plot.Data = [][]float64{samples}
 		} else {
-			dash.plot.Data[0] = samples
+			dash.Plot.Data[0] = samples
 		}
 	}
 
 	app.stream = st.Bind(m, app.ch, n)
-	dash.plot.Title = m.Name
-	ui.Render(app.dash.plot)
-}
-
-func (dash *MetricsDash) OnKeyPressed(key string) bool {
-	drawables := make([]ui.Drawable, 0)
-
-	if dash.prompt.OnKeyPressed(key) {
-		drawables = append(drawables, dash.prompt)
-	}
-
-	if dash.list.OnKeyPressed(key) {
-		drawables = append(drawables, dash.list)
-	}
-
-	ui.Render(drawables...)
-	return false
+	dash.Plot.Title = m.Name
+	ui.Render(app.dash.Plot)
 }
 
 func (app *App) cmdsHandlers() map[string]wg.CmdHandler {
 	return map[string]wg.CmdHandler{
 		"q": app.quit,
-		"f": app.filter,
+		"s": app.filter,
+		"t": app.filterByType,
+		"r": app.reset,
 	}
+}
+
+func (app *App) filterByType(_ string, args ...string) error {
+	if len(args) == 0 {
+		return fmt.Errorf("no type argument provided")
+	}
+
+	switch strings.ToLower(args[0]) {
+	case "all":
+		app.dash.ResetMetrics()
+	case "hist":
+		app.dash.ShowHistograms()
+	default:
+		return fmt.Errorf("unknown metric type\"%s\"", args[0])
+	}
+	return nil
+}
+
+func (app *App) reset(_ string, args ...string) error {
+	app.dash.ResetMetrics()
+	return nil
 }
 
 func (app *App) filter(_ string, args ...string) error {
 	if len(args) == 0 {
 		return fmt.Errorf("no filter specified")
 	}
-	return app.dash.list.Filter(args[0])
+	return app.dash.FilterMetrics(args[0])
 }
 
 func (s *App) quit(_ string, args ...string) error {
@@ -179,12 +157,8 @@ func (s *App) quit(_ string, args ...string) error {
 	return nil
 }
 
-func (s *App) Start() {
-	s.Run()
-}
-
 func (s *App) fetch() {
-	histo, rawMetrics, err := s.fetchMetrics(s.url)
+	histo, rawMetrics, err := s.fetchMetrics(s.metricsURL)
 	if err != nil {
 		return
 	}
@@ -193,7 +167,7 @@ func (s *App) fetch() {
 		s.store.Update(&m)
 	}
 
-	s.store.UpdateHistogram(histo)
+	s.store.UpdateHistograms(histo)
 
 	metrics := make([]wg.MetricInfo, len(rawMetrics)+len(histo))
 	for i, m := range rawMetrics {
@@ -214,19 +188,7 @@ func (s *App) fetch() {
 		i++
 	}
 
-	sort.Slice(metrics, func(i, j int) bool {
-		m1 := metrics[i]
-		m2 := metrics[j]
-
-		if m1.IsHist != m2.IsHist {
-			return m1.IsHist && !m2.IsHist
-		}
-
-		res := strings.Compare(m1.Name, m2.Name)
-		return res < 0
-	})
-
-	s.dash.list.Set(metrics)
+	s.dash.SetMetricList(metrics)
 }
 
 func (s *App) fetchMetrics(url string) (map[string]metric.Histogram, []metric.RawMetric, error) {
@@ -273,40 +235,29 @@ func main() {
 	os.Args = os.Args[1:]
 
 	displayWindow := flag.Duration("window", DefaultDisplayWindow, "time size of displayed window")
-	pollInterval := flag.Duration("refresh-interval", DefaultPollInterval, "the frequency the metric endpoint is queries")
+	pollInterval := flag.Duration("poll-interval", DefaultPollInterval, "the frequency the metric endpoint is queried")
 
 	flag.Parse()
-
-	if err := ui.Init(); err != nil {
-		log.Fatalf("failed to initialize termui: %v", err)
-	}
-	defer ui.Close()
 
 	maxSamples := int(*displayWindow/(*pollInterval)) + 1
 	metricStore := store.NewMetricStore(maxSamples)
 
-	dash := &MetricsDash{
-		prompt: wg.NewPrompt(),
-		plot: wg.NewMetricPlot(
-			5,
-			*pollInterval,
-			*displayWindow,
-		),
-		plotHeightPerc: 0.7,
-		plotWidthPerc:  1,
-	}
+	dash := wg.NewMetricDash(
+		*pollInterval,
+		*displayWindow,
+	)
 
 	app := &App{
 		displayWindow: *displayWindow,
-		fetchInterval: *pollInterval,
+		pollInterval:  *pollInterval,
 		ch:            make(chan float64, 1),
-		url:           url,
+		metricsURL:    url,
 		store:         metricStore,
 		dash:          dash,
 	}
 
-	dash.list = wg.NewMetricList(app.renderMetric)
-	dash.prompt.SetHandlers(app.cmdsHandlers())
+	dash.List = wg.NewMetricList(app.renderMetric)
+	dash.Prompt.SetHandlers(app.cmdsHandlers())
 
 	app.Start()
 }
