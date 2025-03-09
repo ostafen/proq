@@ -3,9 +3,7 @@ name: Release Pipeline
 on:
   push:
     branches:
-      - 'add-release-action'
-    tags:
-      - 'v*.*.*'
+      - 'release/v*.*.*'
 
 permissions:
   contents: write  
