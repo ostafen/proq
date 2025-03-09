@@ -33,7 +33,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: binaries
-          path: ./bin/*  # Path to where your binaries are stored (ensure it's correct)
+          path: bin/*  # Path to where your binaries are stored (ensure it's correct)
 
   release:
     needs: build
@@ -49,6 +49,6 @@ jobs:
       - name: Upload release assets to GitHub
         uses: softprops/action-gh-release@v1
         with:
-          files: ./bin/*  # Path to the built binaries
+          files: bin/*  # Path to the built binaries
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
