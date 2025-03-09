@@ -1,0 +1,58 @@
+name: Release Pipeline
+
+on:
+  push:
+    branches:
+      - 'release/v*.*.*'
+
+permissions:
+  contents: write  
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the code
+        uses: actions/checkout@v2
+
+      - name: Set up Go environment (latest version)
+        uses: actions/setup-go@v2
+        with:
+          go-version: '1.23'
+
+      - name: Set up Makefile for cross-compilation
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y make
+
+      - name: Build binaries for multiple architectures
+        run: |
+          make build  # Ensure your Makefile produces binaries for all required architectures
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: binaries
+          path: bin/*  # Path to where your binaries are stored (ensure it's correct)
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the code
+        uses: actions/checkout@v2
+      
+      - name: Download Build Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: binaries  # Name of the artifact to download
+          path: ./artifacts  # Path to save the downloaded artifacts
+
+      - name: Upload release assets to GitHub
+        uses: softprops/action-gh-release@v1
+        with:
+          files: ./artifacts/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
