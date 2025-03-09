@@ -18,7 +18,7 @@
 go install github.com/ostafen/proq@latest
 ```
 
-### Manual Build
+### Build
 ```sh
 git clone https://github.com/ostafen/proq.git
 cd proq
@@ -35,9 +35,8 @@ proq http://localhost:9090/metrics
 
 ## Configuration
 You can pass the following flags:
-- 🌍 `--endpoint` – The URL of the server exposing Prometheus metrics
-- 🔄 `--refresh` – Refresh rate for fetching new metrics (default: 5s)
-- 🎨 `--theme` – Customize terminal colors for the UI
+- 🌍 `--window` – The size of the displayed time window (default: 1min).
+- 🔄 `--refresh-interval` – Refresh rate for fetching new metrics (default: 1s)
 
 ## Contributing
 Contributions are welcome! To contribute:
