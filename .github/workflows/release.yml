@@ -47,11 +47,11 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            proq-darwin-amd64
-            proq-darwin-arm64
-            proq-linux-amd64
-            proq-linux-arm
-            proq-linux-arm64
-            proq-windows-amd64
+            bin/proq-darwin-amd64
+            bin/proq-darwin-arm64
+            bin/proq-linux-amd64
+            bin/proq-linux-arm
+            bin/proq-linux-arm64
+            bin/proq-windows-amd64
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
