@@ -12,37 +12,22 @@
 
 ### Using Go
 ```sh
-go install github.com/yourusername/proq@latest
+go install github.com/ostafen/proq@latest
 ```
 
 ### Manual Build
 ```sh
-git clone https://github.com/yourusername/proq.git
+git clone https://github.com/ostafen/proq.git
 cd proq
-go build -o proq
-mv proq /usr/local/bin/
+make build
 ```
 
 ## Usage
 
-### Start the embedded server and pull metrics
-```sh
-proq --endpoint http://localhost:9090/metrics
-```
+### Start pulling metrics
 
-### View available metrics
 ```sh
-proq list
-```
-
-### Plot a specific metric
-```sh
-proq plot http_requests_total
-```
-
-### Show a histogram of a metric
-```sh
-proq hist response_time_seconds
+proq http://localhost:9090/metrics
 ```
 
 ## Configuration
